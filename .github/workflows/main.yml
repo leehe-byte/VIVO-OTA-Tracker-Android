@@ -3,6 +3,8 @@ name: Android CI
 on:
   workflow_dispatch:
   push:
+    branches:
+      - main # push main 也编译一遍（只上传 artifact，不发 Release），便于随时确认构建是绿的
     tags:
       - 'v*' # 推送 v 开头的 tag 时编译并发布 Release
 
@@ -59,19 +61,47 @@ jobs:
         with:
           cache-read-only: false
 
-      # keystore 以 base64 存在 Secret 里，落到 $RUNNER_TEMP 后转成组路径变量
+      # keystore 以 base64 存在 Secret 里，落到 $RUNNER_TEMP 后转成 VOTA_* 环境变量。
+      # 粘贴 base64 时经常会带上换行/空格，所以先把所有空白剥掉再解码；
+      # 解码失败或口令不对要在这里就给出可诊断的错误，而不是让后面的 Gradle 神秘失败。
       - name: Prepare signing keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_FILE }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
-          if [ -z "$KEYSTORE_BASE64" ]; then
-            echo "::warning::KEYSTORE_FILE secret 为空，release 将不签名"
-            exit 0
+          set -euo pipefail
+          if [ -z "${KEYSTORE_BASE64:-}" ]; then
+            echo "::error::KEYSTORE_FILE secret 为空或不存在，请到 Settings -> Secrets and variables -> Actions 配置"
+            exit 1
           fi
+
+          CLEAN="$(printf '%s' "$KEYSTORE_BASE64" | tr -d '[:space:]')"
+          echo "secret 长度 ${#KEYSTORE_BASE64}，去掉空白后 ${#CLEAN}"
+
           KEYSTORE_PATH="$RUNNER_TEMP/release.keystore"
-          printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$KEYSTORE_PATH"
+          if ! printf '%s' "$CLEAN" | base64 -d > "$KEYSTORE_PATH" 2>/dev/null; then
+            echo "::error::base64 解码失败。请用 [Convert]::ToBase64String([IO.File]::ReadAllBytes('keystore.jks')) 重新生成，只粘贴 base64 本体（不要前缀、不要文件名）"
+            echo "前 24 个字符: $(printf '%s' "$CLEAN" | head -c 24)"
+            exit 1
+          fi
+
+          SIZE="$(stat -c%s "$KEYSTORE_PATH")"
+          echo "解码后大小 ${SIZE} bytes"
+          if [ "$SIZE" -lt 100 ]; then
+            echo "::error::解码结果只有 ${SIZE} 字节，明显不是 keystore，请检查 Secret 内容"
+            exit 1
+          fi
+
+          # 自检：这份 keystore 能否用给定的口令打开、别名是否存在
+          if ! keytool -list -keystore "$KEYSTORE_PATH" \
+                 -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" > /dev/null 2>&1; then
+            echo "::error::keystore 已解出，但用 KEYSTORE_PASSWORD / KEY_ALIAS 打不开，请核对这两个 Secret"
+            exit 1
+          fi
+          echo "keystore 校验通过"
+
           echo "VOTA_STORE_FILE=$KEYSTORE_PATH" >> "$GITHUB_ENV"
-          echo "keystore: $(stat -c%s "$KEYSTORE_PATH") bytes"
 
       - name: Run unit tests
         run: ./gradlew testDebugUnitTest
