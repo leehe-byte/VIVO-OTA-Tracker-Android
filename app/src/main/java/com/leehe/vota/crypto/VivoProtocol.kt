@@ -1,3 +1,11 @@
+/*
+ * Copyright 2026 leehe-byte
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Kotlin 移植自 VIVO-OTA-Tracker（https://github.com/JerryTse-OSS/VIVO-OTA-Tracker，
+ * Apache License 2.0）的 Python 实现，并为 Android 做了修改。
+ * 已修改的文件清单、改动范围与上游对应关系见仓库根目录的 NOTICE。
+ */
 package com.leehe.vota.crypto
 
 import java.io.ByteArrayOutputStream

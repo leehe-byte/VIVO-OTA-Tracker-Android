@@ -150,6 +150,17 @@ jobs:
           mkdir -p final_artifacts
           cp app/build/outputs/apk/release/*.apk "final_artifacts/${OUTPUT_NAME}"
 
+          # Apache-2.0 §4 要求随分发提供许可证副本；本项目是 MIT + Apache-2.0 双许可，
+          # 所以三份文件都随产物一起发，便于一次性取走。
+          for f in LICENSE NOTICE LICENSES/Apache-2.0.txt; do
+            if [ ! -f "$f" ]; then
+              echo "::error::$f 不存在，许可文件必须随发行版提供"
+              exit 1
+            fi
+            mkdir -p "final_artifacts/$(dirname "$f")"
+            cp "$f" "final_artifacts/$f"
+          done
+
           echo "FINAL_FILENAME=${OUTPUT_NAME}" >> "$GITHUB_ENV"
           echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
 
@@ -179,12 +190,20 @@ jobs:
             - 查询接口沿用原 Python 项目的 TLS 行为（**不校验服务端证书**），Bing 图片链路正常校验
             - 仅供技术学习与交流，请勿用于任何非法或商业用途
 
+            ### 许可
+
+            本项目双许可：界面与构建配置为 **MIT**；协议移植部分（`crypto/` `net/` `data/`）
+            来自 [JerryTse-OSS/VIVO-OTA-Tracker](https://github.com/JerryTse-OSS/VIVO-OTA-Tracker)，
+            按 **Apache License 2.0** 发布并已修改，逐文件说明见 `NOTICE`。
+            许可证副本随本 Release 附带，请一并保留。
+
             实现细节、协议对照与踩坑记录见 [README](https://github.com/${{ github.repository }}#readme)。
 
             ---
 
-            本次构建产物：`${{ env.FINAL_FILENAME }}`
-          files: final_artifacts/*.apk
+            本次构建产物：`${{ env.FINAL_FILENAME }}`，以及许可证副本
+            `LICENSE`、`NOTICE`、`LICENSES/Apache-2.0.txt`
+          files: final_artifacts/**
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -193,7 +212,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.FINAL_FILENAME }}
-          path: final_artifacts/*.apk
+          path: final_artifacts/**
           retention-days: 7
 
       # 放在最后：签名配置有问题时，前面照常编译（能看到构建是否健康），

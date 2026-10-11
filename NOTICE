@@ -1,0 +1,45 @@
+VIVO OTA Tracker · Android
+Copyright 2026 leehe-byte
+
+This product includes software developed as part of the
+VIVO-OTA-Tracker project (https://github.com/JerryTse-OSS/VIVO-OTA-Tracker),
+licensed under the Apache License, Version 2.0.
+
+The following parts of this project are a Kotlin port of that project's
+implementation, and have been modified for the Android platform:
+
+  app/src/main/java/com/leehe/vota/crypto/VivoProtocol.kt
+      Kotlin port of the AES-128-CBC helpers, the protocol package
+      builder/parser, and the URL-safe base64 helpers
+      (upstream: aes_encrypt / aes_decrypt / build_protocol_package /
+       extract_encrypted_body / base64_url_encode / base64_url_decode /
+       encrypt_to_jvq / decrypt_response).
+      Modified: reimplemented with javax.crypto in place of PyCryptodome;
+      documentation rewritten; padding-tolerant base64 decoder added.
+
+  app/src/main/java/com/leehe/vota/data/OtaRepository.kt
+      Kotlin port of the request-parameter construction and the response
+      parser (upstream: build_request_params / join_params /
+       extract_json_str / normalize_json_url / parse_update_response).
+      Modified: rewritten in Kotlin with an ordered map, unit-testable
+      error reporting, and explicit verbose logging hooks.
+
+  app/src/main/java/com/leehe/vota/net/OtaHttpClient.kt
+      Kotlin port of the HTTP transport (upstream: SSLAdapter / http_post /
+       send_encrypted_request).
+      Modified: uses HttpURLConnection with a custom X509TrustManager
+      instead of requests + urllib3, so that no third-party HTTP client is
+      required; retry policy moved to the caller.
+
+  tools/protocol_check.py
+      Cross-check helper that imports the upstream implementation directly
+      in order to verify that this port produces identical derived values.
+      It is not part of the application and is not distributed in the APK.
+
+The upstream project ships no NOTICE file; this file is provided by this
+project to satisfy section 4(d) of the Apache License, Version 2.0.
+
+The remainder of this repository - the Android application (Compose UI,
+liquid glass presentation, background sources, view model) and the build
+and CI configuration - is original work of leehe-byte and is licensed
+under the MIT License (see LICENSE).

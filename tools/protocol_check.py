@@ -2,6 +2,9 @@
 
 用法：
     python tools/protocol_check.py
+
+本文件不在应用内分发，它直接 import 上游实现（Apache-2.0，
+https://github.com/JerryTse-OSS/VIVO-OTA-Tracker）来对比派生值。
 """
 import json
 import sys

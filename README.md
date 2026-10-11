@@ -1,9 +1,12 @@
 # VIVO OTA Tracker · Android
 
-[VIVO-OTA-Tracker](https://github.com/leehe-byte/VIVO-OTA-Tracker) 的 Android 移植版：把官方 OTA 查询协议
+[VIVO-OTA-Tracker](https://github.com/JerryTse-OSS/VIVO-OTA-Tracker) 的 Android 移植版：把官方 OTA 查询协议
 （AES-128-CBC + 16 字节自定义头的 `jvq_param` 加密包）搬到手机上，直接取固件下载直链。
 界面是**液态玻璃**（Kyant `backdrop`，和酷安 16.6.1 同款），背景支持 **Bing 每日一图**、
 **本地相册图片**和**内置色块**三种，切换带玻璃滑块动画。
+
+协议部分（`crypto/` `net/` `data/`）是该 Python 实现的**逐行移植并做了修改**，
+按上游的 Apache License 2.0 发布，详见 [§ 许可](#十许可) 与 [`NOTICE`](NOTICE)。
 
 已在一台 **vivo X100 Pro（V2324A / PD2324，Android 16 / API 36）** 上真机验证，成功取到真实固件直链：
 
@@ -313,8 +316,34 @@ Bing 每日一图的图片版权归 Microsoft / 原作者所有，本应用仅�
 
 ## 十、许可
 
-本仓库（Android 端代码与界面）以 [MIT](LICENSE) 许可发布，© 2026 leehe-byte。
+本项目采用**双许可**，按代码来源区分：
 
-上游 Python 项目 [VIVO-OTA-Tracker](https://github.com/leehe-byte/VIVO-OTA-Tracker) 的协议实现与固件查询逻辑由其原作者
-按原许可发布；本项目对协议的移植属于衍生使用，转载或二次分发时请一并遵守上游许可。
+| 范围 | 许可 | 文件 |
+|---|---|---|
+| 本项目的原创部分：Compose 界面、液态玻璃表现层、背景来源、ViewModel、构建与 CI 配置 | **MIT** | [`LICENSE`](LICENSE) |
+| 协议移植部分：`crypto/VivoProtocol.kt`、`data/OtaRepository.kt`、`net/OtaHttpClient.kt`（以及仅用于校验、不随应用分发的 `tools/protocol_check.py`） | **Apache-2.0** | [`LICENSES/Apache-2.0.txt`](LICENSES/Apache-2.0.txt) |
+
+```
+MIT License (本项目原创部分)
+Copyright (c) 2026 leehe-byte
+
+Apache License, Version 2.0 (协议移植部分)
+Copyright 2026 leehe-byte
+包含来自 VIVO-OTA-Tracker 项目（https://github.com/JerryTse-OSS/VIVO-OTA-Tracker）
+的代码，按 Apache License 2.0 授权。
+```
+
+上游 [JerryTse-OSS/VIVO-OTA-Tracker](https://github.com/JerryTse-OSS/VIVO-OTA-Tracker)
+以 **Apache License 2.0** 发布。协议移植属于其衍生作品，因此这部分保留 Apache-2.0，
+并履行该许可 §4 的义务：附许可证副本、标明改动过的文件、保留署名。
+
+- 逐文件的改动说明与上游对应关系：[`NOTICE`](NOTICE)
+- 移植文件头部带 `SPDX-License-Identifier: Apache-2.0` 标记
+
+MIT 与 Apache-2.0 兼容（Apache-2.0 允许再以 MIT 分发），但**转载或二次分发时请同时保留
+`LICENSE`、`LICENSES/Apache-2.0.txt` 与 `NOTICE` 三份文件**，不要只保留 MIT。
+
+> 上游 Apache-2.0 覆盖的是其自身代码。协议里的 AES 密钥与 IV 是上游从
+> `libvivoseckey_n4.so` 逆向得到的，这部分与上游许可无关，本项目沿用其数值但不做额外主张。
+
 
