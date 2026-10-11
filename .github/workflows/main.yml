@@ -62,11 +62,16 @@ jobs:
           cache-read-only: false
 
       # keystore 以 base64 存在 Secret 里，落到 $RUNNER_TEMP 后转成 VOTA_* 环境变量。
-      # 粘贴 base64 时经常会带上换行/空格，所以先把所有空白剥掉再解码；
-      # 解码失败或口令不对要在这里就给出可诊断的错误，而不是让后面的 Gradle 神秘失败。
+      # keystore 以 base64 存在 Secret 里，落到 $RUNNER_TEMP 后转成 VOTA_* 环境变量。
       #
-      # continue-on-error：签名配置有问题时不让整条流水线停在第一步 ——
-      # 后面的单元测试与编译照跑（产物未签名），构建是否健康仍然看得出来。
+      # 两种常见形态都吃：
+      #   1) 纯 base64（不含换行或含换行都可以）
+      #   2) PEM 包装：-----BEGIN CERTIFICATE----- / -----END CERTIFICATE----- 夹着 base64
+      #      （把 PKCS12 当证书导出时就会长这样，密钥库本体其实完整地在里面）
+      # 所以先把 PEM 头尾和所有空白剥掉，再喂给 base64 -d。
+      #
+      # continue-on-error：签名配置有问题时不阻断后面的单元测试与编译，
+      # 由最后的「Verify signing config」步骤统一把任务标红（错误不会被吞掉）。
       - name: Prepare signing keystore
         continue-on-error: true
         id: keystore
@@ -76,7 +81,7 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
           fail() {
-            # 把关键信息同时放进注释，方便在 Actions 页面直接看到，不必翻日志
+            # 关键信息同时放进注释，方便在 Actions 页面直接看到，不必翻日志
             echo "::error title=签名配置有问题::$1"
             echo "::warning title=继续构建::$2"
             exit 1
@@ -87,15 +92,18 @@ jobs:
                  "release 将不签名；请到 Settings -> Secrets and variables -> Actions 配置 KEYSTORE_FILE"
           fi
 
-          CLEAN="$(printf '%s' "$KEYSTORE_BASE64" | tr -d '[:space:]')"
-          echo "secret 长度 ${#KEYSTORE_BASE64}，去掉空白后 ${#CLEAN}"
+          # 去掉 PEM 头尾与全部空白
+          CLEAN="$(printf '%s' "$KEYSTORE_BASE64" \
+                   | sed -e 's/-----BEGIN [A-Z ]*-----//g' -e 's/-----END [A-Z ]*-----//g' \
+                   | tr -d '[:space:]')"
+          echo "secret 长度 ${#KEYSTORE_BASE64}，清洗后 ${#CLEAN}"
 
           KEYSTORE_PATH="$RUNNER_TEMP/release.keystore"
           if ! printf '%s' "$CLEAN" | base64 -d > "$KEYSTORE_PATH" 2>/dev/null; then
             PREFIX="$(printf '%s' "$CLEAN" | head -c 24)"
             echo "前 24 个字符: ${PREFIX}"
             fail "base64 解码失败（前 24 个字符：${PREFIX}）" \
-                 "请用 [Convert]::ToBase64String([IO.File]::ReadAllBytes('keystore.jks')) 重新生成，只粘贴 base64 本体（不要 'base64:' 前缀、不要文件名、不要引号）"
+                 "请把 keystore 的 base64 正文粘进 Secret：PowerShell 用 [Convert]::ToBase64String([IO.File]::ReadAllBytes('keystore.jks')) 生成；带 PEM 头尾也可以，但内容必须是 base64"
           fi
 
           SIZE="$(stat -c%s "$KEYSTORE_PATH")"
@@ -107,7 +115,7 @@ jobs:
           # 自检：这份 keystore 能否用给定的口令打开、别名是否存在
           if ! keytool -list -keystore "$KEYSTORE_PATH" \
                  -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" > /dev/null 2>&1; then
-            fail "keystore 已解出，但用 KEYSTORE_PASSWORD / KEY_ALIAS 打不开" \
+            fail "keystore 已解出（${SIZE} bytes），但用 KEYSTORE_PASSWORD / KEY_ALIAS 打不开" \
                  "请核对 KEYSTORE_PASSWORD（store 口令）与 KEY_ALIAS"
           fi
           echo "keystore 校验通过（${SIZE} bytes）"
@@ -187,3 +195,11 @@ jobs:
           name: ${{ env.FINAL_FILENAME }}
           path: final_artifacts/*.apk
           retention-days: 7
+
+      # 放在最后：签名配置有问题时，前面照常编译（能看到构建是否健康），
+      # 但任务最终必须标红 —— 不能让「未签名」的产物被当成成功发出去。
+      - name: Verify signing config
+        if: steps.keystore.outcome != 'success'
+        run: |
+          echo "::error title=构建完成但未签名::签名配置有误，产物没有用 release key 签名，请按上面 Prepare signing keystore 的提示修正 Secret"
+          exit 1
