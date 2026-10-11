@@ -1,35 +1,36 @@
-# Gradle files
+# ---- Gradle / 构建产物 ----
 .gradle/
 build/
 .kotlin/
-
-# Local configuration file (sdk path, etc)
-local.properties
-
-# Log/OS Files
-*.log
-
-# Android Studio generated files and folders
 captures/
 .externalNativeBuild/
 .cxx/
 *.aab
 *.apk
+*.ap_
+*.dex
 output-metadata.json
 
-# IntelliJ
+# ---- 本地配置（SDK 路径等）----
+local.properties
+
+# ---- 签名与口令：绝不入库 ----
+keystore.properties
+*.jks
+*.keystore
+google-services.json
+
+# ---- 日志 / 系统文件 ----
+*.log
+.DS_Store
+*.hprof
+
+# ---- IntelliJ / Android Studio ----
 *.iml
 .idea/
 misc.xml
 deploymentTargetDropDown.xml
 render.experimental.xml
 
-# Keystore files
-*.jks
-*.keystore
-
-# Google Services (e.g. APIs or Firebase)
-google-services.json
-
-# Android Profiling
-*.hprof
+# ---- 本地测试素材 ----
+/local-image-tests/

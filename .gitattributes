@@ -1,0 +1,22 @@
+# 统一换行：仓库里存 LF，Windows 上检出成 CRLF（避免每次改动整个文件都算 diff）
+* text=auto eol=lf
+
+# Windows 脚本必须保持 CRLF，否则 cmd.exe 可能解析失败
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# 二进制，不做任何转换
+*.png binary
+*.jpg binary
+*.webp binary
+*.jar binary
+*.jks binary
+*.keystore binary
+*.apk binary
+
+# 语言统计
+*.kt text
+*.kts text
+*.xml text
+*.yml text
+*.md text
