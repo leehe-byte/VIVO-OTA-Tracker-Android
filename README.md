@@ -228,18 +228,25 @@ git tag v1.0.0 && git push origin v1.0.0   # 触发 CI 编译 + 发布 Release
 | 触发 | 行为 |
 |---|---|
 | push tag `v*` | 跑单元测试 → 编译 release APK → 建 Release 并附上 APK |
-| 手动 `workflow_dispatch` | 编译 + 上传 artifact（保留 7 天） |
+| push `main` | 同上，但只上传 artifact（保留 7 天），不发 Release |
+| 手动 `workflow_dispatch` | 同上 |
+
+发版就是打个 tag：
+
+```bash
+git tag v1.0.0 && git push origin v1.0.0
+```
 
 在仓库 Secrets 里需要这几个（Settings → Secrets and variables → Actions）：
 
 | Secret | 内容 |
 |---|---|
-| `KEYSTORE_FILE` | keystore（`.jks`）的 **base64**，Windows 下用 `[Convert]::ToBase64String([IO.File]::ReadAllBytes('keystore.jks'))` 生成 |
+| `KEYSTORE_FILE` | keystore 的 **base64**：`[Convert]::ToBase64String([IO.File]::ReadAllBytes('keystore.jks'))`；带 `-----BEGIN CERTIFICATE-----` 的 PEM 包装同样可以 |
 | `KEYSTORE_PASSWORD` | store 口令 |
 | `KEY_ALIAS` | key 别名 |
-| `KEY_PASSWORD` | key 口令 |
+| `KEY_PASSWORD` | key 口令（PKCS12 下可以与 store 口令不同） |
 
-两个和本地环境不同、容易在 CI 上翻车的点，workflow 里都处理了：
+### 三个在 CI 上翻过车的点，workflow 里都处理了
 
 1. **`compileSdk` 是 37.2**，GitHub 托管 runner 自带的 SDK 里没有这个平台。
    workflow 会先把 `platforms;android-37.2` 和 `build-tools;36.0.0` 装上
@@ -249,6 +256,16 @@ git tag v1.0.0 && git push origin v1.0.0   # 触发 CI 编译 + 发布 Release
    它会把请求代理到 `dl.google.com`，workflow 再通过环境变量把
    `MAVEN_GROUP=com.android.tools.build` / `MAVEN_NAME=gradle` / `MAVEN_VERSION=9.2.1`
    传给 runner，让这个代理指向正确的构件。
+3. **keystore secret 的形态**。`KEYSTORE_FILE` 里是 PEM（`-----BEGIN CERTIFICATE-----`
+   夹着 PKCS12 的 base64）时，`base64 -d` 会直接失败 —— 这个坑踩过一次，
+   现在解码前会先剥掉 PEM 头尾和所有空白，两种形态都能吃。
+   另外解出文件后立刻用 `keytool -list -storepass ... -alias ...` 自检，
+   口令/别名不对当场报错，不会拖到 Gradle 阶段变成一句模糊的签名异常。
+
+签名相关步骤的设计：`Prepare signing keystore` 带 `continue-on-error`，
+所以签名配置有问题时**单元测试与编译照跑**（能看出构建本身是否健康），
+最后由 `Verify signing config` 把任务标红 —— 未签名的产物不会被当成成功发出去。
+错误信息用 `::error title=...` 写成注释，在 Actions 页面直接可见，不必翻日志。
 
 ## 七、验证方式
 
